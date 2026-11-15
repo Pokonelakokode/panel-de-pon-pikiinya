@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.pnpm-store/
+.npm-cache/
+*.log
+.DS_Store
+shots/
+.chrome-profile/
+*.sfc
+*.fig
+*.smc
+*.zip

@@ -1,0 +1,12 @@
+node_modules
+dist
+.pnpm-store
+.npm-cache
+.chrome-profile*
+.chrome-p*
+shots
+test
+tools
+.git
+*.fig
+*.log
