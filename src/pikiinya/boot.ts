@@ -1,5 +1,6 @@
 import { PikiinyaController } from './ui.ts';
 import type { SnesBridgeApi } from './types.ts';
+import { onlineClient } from '../net/online-client.ts';
 
 let pikiController: PikiinyaController | null = null;
 
@@ -87,13 +88,29 @@ function initDualGameTabs(): void {
   tabPdp.addEventListener('keydown', handleTablistKeys);
   tabPiki.addEventListener('keydown', handleTablistKeys);
 
+  // Expose helpers for Online Multiplayer lobby
+  const win = window as unknown as {
+    onlineClient?: typeof onlineClient;
+    appSelectGame?: (game: 'pdp' | 'pikiinya') => void;
+    getPikiinyaController?: () => PikiinyaController | null;
+    openOnlineModalForJoin?: (code: string, game: 'pdp' | 'pikiinya') => void;
+  };
+  win.onlineClient = onlineClient;
+  win.appSelectGame = (g) => applyGameSelection(g);
+  win.getPikiinyaController = () => ensurePikiinyaLoaded(bridge);
+
   // Check URL query (?game=pikiinya) or hash (#pikiinya)
   const params = new URLSearchParams(window.location.search);
   const requested = params.get('game');
-  if (requested === 'pikiinya' || window.location.hash === '#pikiinya') {
-    applyGameSelection('pikiinya');
-  } else {
-    applyGameSelection('pdp');
+  const initialGame: 'pdp' | 'pikiinya' =
+    requested === 'pikiinya' || window.location.hash === '#pikiinya' ? 'pikiinya' : 'pdp';
+  applyGameSelection(initialGame);
+
+  const joinRoomCode = params.get('room');
+  if (joinRoomCode && joinRoomCode.trim()) {
+    window.setTimeout(() => {
+      win.openOnlineModalForJoin?.(joinRoomCode.trim().toUpperCase(), initialGame);
+    }, 60);
   }
 }
 

@@ -39,6 +39,7 @@ import {
   renderNextQuadCanvas,
   renderPikiBoard,
 } from './render.ts';
+import { onlineClient } from '../net/online-client.ts';
 
 interface PadTracker {
   dirX: -1 | 0 | 1;
@@ -168,6 +169,7 @@ export class PikiinyaController {
   private highScores: Record<string, number> = {
     story: safeLoadNumber('piki_hi_story', 12000),
     vs2p: safeLoadNumber('piki_hi_vs2p', 10000),
+    online: safeLoadNumber('piki_hi_online', 10000),
     stageclear: safeLoadNumber('piki_hi_stage', 8000),
     endless: safeLoadNumber('piki_hi_endless', 15000),
     endurance: safeLoadNumber('piki_hi_endurance', 1200),
@@ -175,6 +177,10 @@ export class PikiinyaController {
     puzzle: safeLoadNumber('piki_hi_puzzle', 5000),
     tutorial: 0,
   };
+
+  private lastOnlineSyncMs = 0;
+  private onlineMatchSeed = 1;
+  private onlineCols: number | null = null;
 
   private board!: PikiBoardState;
   private p2Board!: PikiBoardState;
@@ -328,6 +334,7 @@ export class PikiinyaController {
         <div class="flex flex-wrap items-center gap-1" role="group" aria-label="Pikiinya Game Modes">
           <button type="button" data-piki-mode="story" class="piki-mode-btn snes-btn px-2 py-1 rounded-xl text-[11px] font-bold">⚔️ Andes VS</button>
           <button type="button" data-piki-mode="vs2p" class="piki-mode-btn snes-btn px-2 py-1 rounded-xl text-[11px] font-bold">👥 2P VS</button>
+          <button type="button" data-piki-mode="online" class="piki-mode-btn snes-btn px-2 py-1 rounded-xl text-[11px] font-bold">🌐 Online</button>
           <button type="button" data-piki-mode="stageclear" class="piki-mode-btn snes-btn px-2 py-1 rounded-xl text-[11px] font-bold">🔓 Stage Clear</button>
           <button type="button" data-piki-mode="endless" class="piki-mode-btn snes-btn px-2 py-1 rounded-xl text-[11px] font-bold">♾️ Endless</button>
           <button type="button" data-piki-mode="endurance" class="piki-mode-btn snes-btn px-2 py-1 rounded-xl text-[11px] font-bold">🏃 Endurance</button>
@@ -755,9 +762,19 @@ export class PikiinyaController {
     this.root.querySelectorAll<HTMLButtonElement>('.piki-mode-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
         const nextMode = btn.dataset.pikiMode as PikiMode;
+        if (nextMode === 'online') {
+          if (onlineClient.inMatch && onlineClient.game === 'pikiinya') {
+            this.switchMode('online');
+          } else {
+            (window as unknown as { openOnlineModal?: (game: 'pdp' | 'pikiinya') => void }).openOnlineModal?.('pikiinya');
+          }
+          return;
+        }
         if (nextMode) this.switchMode(nextMode);
       });
     });
+
+    this.bindOnlineEvents();
 
     // Utility buttons
     this.el('piki-btn-setup').addEventListener('click', () => this.toggleSetupPage(!this.setupPageOpen));
@@ -1316,14 +1333,17 @@ export class PikiinyaController {
         : 'piki-mode-btn snes-btn px-2 py-1 rounded-xl text-[11px] font-bold bg-sky-900/80 text-sky-200 border border-sky-600';
     });
 
-    const isDual = this.mode === 'story' || this.mode === 'vs2p';
-    const cols = this.getEffectiveColsForCurrentMode();
+    const isDual = this.mode === 'story' || this.mode === 'vs2p' || this.mode === 'online';
+    const cols =
+      this.mode === 'online' && this.onlineCols !== null
+        ? clampPikiCols(this.onlineCols)
+        : this.getEffectiveColsForCurrentMode();
     this.syncCanvasDimensions(cols, isDual);
 
     this.el('piki-cpu-frame').classList.toggle('hidden', !isDual);
     this.el('piki-cpu-frame').classList.toggle('flex', isDual);
     this.el('piki-story-box').classList.toggle('hidden', this.mode !== 'story');
-    this.el('piki-2p-box').classList.toggle('hidden', this.mode !== 'vs2p');
+    this.el('piki-2p-box').classList.toggle('hidden', this.mode !== 'vs2p' && this.mode !== 'online');
     this.el('piki-stageclear-box').classList.toggle('hidden', this.mode !== 'stageclear');
     this.el('piki-puzzle-box').classList.toggle('hidden', this.mode !== 'puzzle');
     this.el('piki-tutorial-box').classList.toggle('hidden', this.mode !== 'tutorial');
@@ -1347,6 +1367,14 @@ export class PikiinyaController {
       this.el('piki-cpu-avatar').textContent = '🐧';
       this.el('piki-cpu-name').textContent = '2P PLAYER';
       this.el('piki-cpu-role-tag').textContent = '2P HUMAN';
+    } else if (this.mode === 'online') {
+      this.board = createBoardState(this.onlineMatchSeed, { cols, isVsMode: true });
+      this.p2Board = createBoardState(this.onlineMatchSeed, { cols, isVsMode: true });
+      const oppName = onlineClient.peerName || 'Opponent';
+      this.updateSidebarIdentity('🌐', `Online vs ${oppName}`, '"Live Host/Client match over WebSocket!"', 'ONLINE VS');
+      this.el('piki-cpu-avatar').textContent = '🌐';
+      this.el('piki-cpu-name').textContent = oppName.toUpperCase();
+      this.el('piki-cpu-role-tag').textContent = onlineClient.role === 'host' ? 'CLIENT' : 'HOST';
     } else if (this.mode === 'stageclear') {
       const maxUnlocked = this.uraUnlocked ? STAGE_CLEAR_LEVELS.length : 8;
       this.stageClearIdx = ((this.stageClearIdx % maxUnlocked) + maxUnlocked) % maxUnlocked;
@@ -1761,13 +1789,26 @@ export class PikiinyaController {
       this.board.score = Math.max(this.board.score, Math.floor(this.raceDistanceM));
     }
 
-    const isDual = this.mode === 'story' || this.mode === 'vs2p';
+    const isDual = this.mode === 'story' || this.mode === 'vs2p' || this.mode === 'online';
     const p1Soft = this.isActionHeld('p1', 'down') || p1PadDown;
 
     const p1Events = stepBoard(this.board, dt, this.getFallSpeed(), {
       opponent: isDual ? this.p2Board : null,
       softDropping: p1Soft,
     });
+    if (this.mode === 'online' && onlineClient.inMatch) {
+      if (p1Events.cleared && p1Events.cleared.garbageSent > 0) {
+        onlineClient.sendAttack({
+          blocks: p1Events.cleared.garbageSent,
+          chain: this.board.chainStep,
+        });
+      }
+      const nowMs = performance.now();
+      if (nowMs - this.lastOnlineSyncMs >= 66) {
+        this.lastOnlineSyncMs = nowMs;
+        onlineClient.sendSync(this.serializeOnlineSnapshot(this.board));
+      }
+    }
     if (this.mode === 'puzzle' && !this.tsukuruActive) {
       if (!this.board.current && !this.turnSnapshotRecorded && this.turnStartSnapshot) {
         this.puzzleHistory.push(this.turnStartSnapshot);
@@ -1976,6 +2017,23 @@ export class PikiinyaController {
       }
     }
 
+    if (this.mode === 'online') {
+      if (this.board.toppedOut) {
+        this.p2MatchWins++;
+        this.roundOver = true;
+        this.recordHighScore();
+        this.bridge.audio.playGameOver();
+        onlineClient.sendGameOver({ score: this.board.score });
+        this.showOverlay(
+          '💔',
+          'YOU TOPPED OUT!',
+          `Series: You ${this.p1MatchWins} - ${this.p2MatchWins} ${onlineClient.peerName || 'Opponent'}`,
+          '⚔️ REMATCH'
+        );
+      }
+      return;
+    }
+
     // 5. Generic Top-Out for Solo Modes
     if (this.board.toppedOut) {
       this.roundOver = true;
@@ -1998,6 +2056,7 @@ export class PikiinyaController {
       const keyMap: Record<string, string> = {
         story: 'piki_hi_story',
         vs2p: 'piki_hi_vs2p',
+        online: 'piki_hi_online',
         stageclear: 'piki_hi_stage',
         endless: 'piki_hi_endless',
         endurance: 'piki_hi_endurance',
@@ -2052,6 +2111,15 @@ export class PikiinyaController {
       this.undoPuzzleMove();
       return;
     }
+    if (this.mode === 'online' && (this.roundOver || this.stageClearPending || this.victory)) {
+      if (onlineClient.roomCode) {
+        onlineClient.requestRematch();
+        this.el('piki-ov-primary').textContent = '⏳ WAITING FOR OPPONENT...';
+      } else {
+        (window as unknown as { openOnlineModal?: (g: 'pdp' | 'pikiinya') => void }).openOnlineModal?.('pikiinya');
+      }
+      return;
+    }
     this.initModeBoard();
   }
 
@@ -2094,13 +2162,14 @@ export class PikiinyaController {
     if (this.mode === 'story') {
       this.el('piki-story-streak').textContent = `${this.storyStreak} WINS (BEST: ${this.bestStoryStreak})`;
     }
-    if (this.mode === 'story' || this.mode === 'vs2p') {
+    if (this.mode === 'story' || this.mode === 'vs2p' || this.mode === 'online') {
       const p2G = this.el('piki-p2-garbage-badge');
       p2G.classList.toggle('hidden', this.p2Board.pendingGarbage <= 0);
       p2G.textContent = `🧊 +${this.p2Board.pendingGarbage}`;
       this.el('piki-cpu-score').textContent = String(this.p2Board.score);
-      if (this.mode === 'vs2p') {
-        this.el('piki-2p-tally').textContent = `1P ${this.p1MatchWins} - ${this.p2MatchWins} 2P`;
+      if (this.mode === 'vs2p' || this.mode === 'online') {
+        const label = this.mode === 'online' ? (onlineClient.peerName || 'OPP').slice(0, 8) : '2P';
+        this.el('piki-2p-tally').textContent = `YOU ${this.p1MatchWins} - ${this.p2MatchWins} ${label}`;
       }
     }
 
@@ -2145,7 +2214,7 @@ export class PikiinyaController {
     });
     renderNextQuadCanvas(this.p1NextCtx, this.board.next, this.board.elapsedTime);
 
-    if (this.mode === 'story' || this.mode === 'vs2p') {
+    if (this.mode === 'story' || this.mode === 'vs2p' || this.mode === 'online') {
       renderPikiBoard(this.p2Ctx, this.p2Board, { showGhost: false });
       renderNextQuadCanvas(this.p2NextCtx, this.p2Board.next, this.p2Board.elapsedTime);
     }
@@ -2158,6 +2227,120 @@ export class PikiinyaController {
         this.board.elapsedTime
       );
     }
+  }
+
+  private bindOnlineEvents(): void {
+    onlineClient.on('started', (msg: { game?: string; seed?: number; options?: Record<string, unknown> }) => {
+      if (msg.game !== 'pikiinya') return;
+      this.onlineMatchSeed = Number(msg.seed ?? 1);
+      const colsOpt = Number(msg.options?.cols ?? this.configuredCols);
+      this.onlineCols = Number.isFinite(colsOpt) ? clampPikiCols(colsOpt) : this.configuredCols;
+      this.setupPageOpen = false;
+      this.helpModalOpen = false;
+      this.paused = false;
+      this.mode = 'online';
+      this.initModeBoard();
+      this.hideOverlay();
+      this.syncOstContext();
+      this.log(`🌐 Online match started vs <strong>${onlineClient.peerName || 'Opponent'}</strong>!`);
+    });
+
+    onlineClient.on('sync', (msg: { state?: unknown }) => {
+      if (this.mode !== 'online' || !msg.state || typeof msg.state !== 'object') return;
+      this.applyOnlineSnapshot(msg.state as Record<string, unknown>);
+    });
+
+    onlineClient.on('attack', (msg: { attack?: { blocks?: number; chain?: number } }) => {
+      if (this.mode !== 'online' || !msg.attack) return;
+      const blocks = Number(msg.attack.blocks ?? 0);
+      if (blocks > 0) {
+        this.board.pendingGarbage += blocks;
+        this.bridge.audio.playGarbageLand();
+        this.log(`⚠️ <strong>${onlineClient.peerName || 'Opponent'}</strong> sent <strong>${blocks}</strong> garbage blocks!`);
+      }
+    });
+
+    onlineClient.on('gameover', (msg: { loser?: string }) => {
+      if (this.mode !== 'online' || this.roundOver || this.stageClearPending) return;
+      if (msg.loser !== onlineClient.role) {
+        this.p1MatchWins++;
+        this.stageClearPending = true;
+        this.recordHighScore();
+        this.bridge.audio.playVictory();
+        this.showOverlay(
+          '🏆',
+          'YOU WIN ONLINE!',
+          `${onlineClient.peerName || 'Opponent'} topped out! Series: ${this.p1MatchWins} - ${this.p2MatchWins}`,
+          '⚔️ REMATCH'
+        );
+      }
+    });
+
+    onlineClient.on('peer_left', (msg: { reason?: string }) => {
+      if (this.mode !== 'online') return;
+      this.log(`🔌 ${msg.reason || 'Opponent disconnected.'}`);
+      if (!this.roundOver && !this.stageClearPending) {
+        this.roundOver = true;
+        this.showOverlay('🔌', 'OPPONENT LEFT', msg.reason || 'Connection closed.', '🔄 BACK TO LOBBY');
+      }
+    });
+  }
+
+  private serializeOnlineSnapshot(b: PikiBoardState): Record<string, unknown> {
+    const cols = b.cols || PIKI_COLS;
+    const grid = b.grid.map((row) =>
+      row.slice(0, cols).map((cell) => [
+        cell.type,
+        cell.clearing ? 1 : 0,
+        cell.thawing ? 1 : 0,
+      ])
+    );
+    return {
+      cols,
+      grid,
+      current: b.current
+        ? { c: b.current.col, r: b.current.row, sr: b.current.subRow, cells: b.current.cells }
+        : null,
+      next: b.next,
+      score: b.score,
+      pendingGarbage: b.pendingGarbage,
+      toppedOut: b.toppedOut,
+    };
+  }
+
+  private applyOnlineSnapshot(snap: Record<string, unknown>): void {
+    const cols = clampPikiCols(Number(snap.cols ?? this.p2Board.cols ?? PIKI_COLS));
+    if (this.p2Board.cols !== cols) {
+      this.p2Board = createBoardState(this.onlineMatchSeed, { cols, isVsMode: true });
+    }
+    const rawGrid = snap.grid;
+    if (Array.isArray(rawGrid)) {
+      for (let r = 0; r < Math.min(PIKI_ROWS, rawGrid.length); r++) {
+        const rawRow = rawGrid[r];
+        if (!Array.isArray(rawRow)) continue;
+        for (let c = 0; c < Math.min(cols, rawRow.length); c++) {
+          const entry = rawRow[c];
+          if (Array.isArray(entry)) {
+            const cell = this.p2Board.grid[r][c] ?? createEmptyCell();
+            cell.type = Number(entry[0] ?? CELL.EMPTY) as CellType;
+            cell.clearing = Boolean(entry[1]);
+            cell.thawing = Boolean(entry[2]);
+            this.p2Board.grid[r][c] = cell;
+          }
+        }
+      }
+      updatePikiGroupSizes(this.p2Board.grid);
+    }
+    const cur = snap.current as { c: number; r: number; sr: number; cells: [CellType, CellType, CellType, CellType] } | null;
+    this.p2Board.current = cur
+      ? { col: cur.c, row: cur.r, subRow: cur.sr, cells: cur.cells, lockTimer: 0, rotVisual: 0 }
+      : null;
+    if (Array.isArray(snap.next) && snap.next.length === 4) {
+      this.p2Board.next = snap.next as [CellType, CellType, CellType, CellType];
+    }
+    this.p2Board.score = Number(snap.score ?? this.p2Board.score);
+    this.p2Board.pendingGarbage = Number(snap.pendingGarbage ?? 0);
+    this.p2Board.toppedOut = Boolean(snap.toppedOut);
   }
 
   private log(html: string): void {

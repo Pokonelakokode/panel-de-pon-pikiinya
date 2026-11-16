@@ -20,6 +20,7 @@ export type CellType = (typeof CELL)[keyof typeof CELL];
 export type PikiMode =
   | 'story'
   | 'vs2p'
+  | 'online'
   | 'stageclear'
   | 'endless'
   | 'endurance'

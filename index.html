@@ -298,6 +298,9 @@
             <button type="button" onclick="switchMode('vs2p')" id="mode-vs2p" class="mode-tab snes-btn px-2.5 py-1.5 rounded-xl text-xs font-bold bg-purple-800/80 text-purple-200 border border-purple-500">
                 👥 2P Battle
             </button>
+            <button type="button" onclick="openOnlineModal('pdp')" id="mode-online" class="mode-tab snes-btn px-2.5 py-1.5 rounded-xl text-xs font-bold bg-purple-800/80 text-purple-200 border border-purple-500">
+                🌐 Online
+            </button>
             <button type="button" onclick="switchMode('timeattack')" id="mode-timeattack" class="mode-tab snes-btn px-2.5 py-1.5 rounded-xl text-xs font-bold bg-purple-800/80 text-purple-200 border border-purple-500">
                 ⏱️ 2-Min Time
             </button>
@@ -826,6 +829,77 @@
     </dialog>
 
     <!-- Original SNES ROM (.zip / .fig / .sfc) Emulator Modal -->
+    <!-- Online Host / Client Multiplayer Modal -->
+    <div id="online-modal" class="hidden fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-900 border-2 border-cyan-400 rounded-2xl max-w-lg w-full p-5 text-white shadow-2xl">
+            <div class="flex items-center justify-between border-b border-slate-700 pb-3 mb-4">
+                <div class="flex items-center gap-2">
+                    <h2 class="pixel-font text-sm text-cyan-300">🌐 ONLINE MULTIPLAYER</h2>
+                    <span id="online-game-badge" class="text-[10px] px-2 py-0.5 rounded-full bg-pink-600 text-white font-bold">PANEL DE PON</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span id="online-ping-badge" class="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-800 text-emerald-300 border border-slate-600">-- ms</span>
+                    <button type="button" onclick="closeOnlineModal()" class="text-slate-300 hover:text-white text-xl font-bold px-2">✕</button>
+                </div>
+            </div>
+
+            <div class="mb-4">
+                <label for="online-player-name" class="block text-xs text-slate-300 font-bold mb-1">Your Player Name</label>
+                <input id="online-player-name" type="text" maxlength="20" placeholder="Player" class="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-600 text-sm text-white focus:outline-none focus:border-cyan-400" />
+            </div>
+
+            <div id="online-lobby-idle" class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                <div class="bg-slate-800/80 border border-cyan-500/40 rounded-xl p-3 flex flex-col justify-between gap-3">
+                    <div>
+                        <div class="text-xs font-bold text-cyan-300 mb-1">🏠 HOST A ROOM</div>
+                        <p class="text-[11px] text-slate-300">Create a room code and invite a friend to play live over the internet.</p>
+                    </div>
+                    <button type="button" id="online-host-btn" onclick="handleOnlineHostClick()" class="snes-btn w-full py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-xs border border-cyan-300">
+                        🏠 Create Room (Host)
+                    </button>
+                </div>
+
+                <div class="bg-slate-800/80 border border-pink-500/40 rounded-xl p-3 flex flex-col justify-between gap-2">
+                    <div>
+                        <div class="text-xs font-bold text-pink-300 mb-1">🚀 JOIN A ROOM</div>
+                        <input id="online-join-code" type="text" maxlength="4" placeholder="ABCD" class="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-600 text-center pixel-font text-sm tracking-widest uppercase text-yellow-300 focus:outline-none focus:border-pink-400" />
+                    </div>
+                    <button type="button" id="online-join-btn" onclick="handleOnlineJoinClick()" class="snes-btn w-full py-2.5 rounded-xl bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white font-bold text-xs border border-pink-300">
+                        🚀 Join Room (Client)
+                    </button>
+                </div>
+            </div>
+
+            <div id="online-lobby-room" class="hidden bg-slate-800/90 border border-cyan-400/50 rounded-xl p-4 mb-4 space-y-3">
+                <div class="flex items-center justify-between gap-2 flex-wrap">
+                    <div>
+                        <div class="text-[10px] text-slate-400 uppercase font-bold">Room Code</div>
+                        <div id="online-room-code-display" class="pixel-font text-xl text-yellow-300 tracking-widest">----</div>
+                    </div>
+                    <button type="button" onclick="copyOnlineInviteLink()" class="snes-btn px-3 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-xs font-bold border border-slate-400 text-cyan-200">
+                        📋 Copy Invite Link
+                    </button>
+                </div>
+
+                <div class="text-xs bg-slate-950/70 rounded-lg p-2.5 border border-slate-700 space-y-1">
+                    <div id="online-role-line" class="font-bold text-cyan-300">Role: Host</div>
+                    <div id="online-peer-line" class="text-slate-300">Waiting for opponent to join...</div>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <button type="button" id="online-start-btn" onclick="handleOnlineStartClick()" class="hidden snes-btn flex-1 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-white font-bold text-xs border border-emerald-200">
+                        ⚔️ START ONLINE MATCH
+                    </button>
+                    <button type="button" onclick="handleOnlineLeaveClick()" class="snes-btn px-4 py-2.5 rounded-xl bg-rose-700 hover:bg-rose-600 text-white font-bold text-xs border border-rose-300">
+                        🚪 Leave
+                    </button>
+                </div>
+            </div>
+
+            <div id="online-status-msg" class="text-xs text-center text-slate-300 min-h-[1.25rem]"></div>
+        </div>
+    </div>
+
     <div id="rom-modal" class="hidden fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div class="snes-frame rounded-2xl max-w-2xl w-full p-5 bg-[#1b1130] text-white space-y-4">
             <div class="flex items-center justify-between border-b border-purple-600 pb-3">
@@ -1578,6 +1652,7 @@
             endless: 12500,
             vs: savedHighVs,
             vs2p: 15000,
+            online: 15000,
             timeattack: 9500,
             puzzle: 5000
         };
@@ -1800,6 +1875,8 @@
                 setupFairyBoss(state.fairyStage);
             } else if (state.mode === 'vs2p') {
                 setupHuman2PBattle();
+            } else if (state.mode === 'online') {
+                setupOnlineBattle();
             } else if (state.mode === 'timeattack') {
                 state.remainingSec = 120;
                 updateCharacterCard('🧚‍♀️', 'Lip - Time Attack', '"How high can you score in 2 minutes?"', '2 MIN');
@@ -2449,6 +2526,12 @@
             if (state.mode === 'vs' || state.mode === 'vs2p') {
                 const targetLabel = state.mode === 'vs2p' ? 'Player 2' : getCpuProfileForStage(state.fairyStage).shortName;
                 sendVsAttack(count, state.activeChain, state.cpu.grid, state.cpu.popups, targetLabel, true);
+            } else if (state.mode === 'online' && window.onlineClient && window.onlineClient.inMatch) {
+                if (count >= 4 || state.activeChain >= 2) {
+                    window.onlineClient.sendAttack({ count, chain: state.activeChain });
+                    const oppLabel = window.onlineClient.peerName || 'Opponent';
+                    logEvent('⚔️ Sent <strong>' + (state.activeChain >= 2 ? state.activeChain + 'x Chain Garbage' : count + '-Combo Slab') + '</strong> to ' + oppLabel + '!');
+                }
             }
 
             return true;
@@ -3630,6 +3713,14 @@
                 pop.life -= dt;
                 if (pop.life <= 0) state.popups.splice(i, 1);
             }
+
+            if (state.mode === 'online' && window.onlineClient && window.onlineClient.inMatch) {
+                const nowMs = performance.now();
+                if (nowMs - lastPdpOnlineSyncMs >= 66) {
+                    lastPdpOnlineSyncMs = nowMs;
+                    window.onlineClient.sendSync(serializePdpOnlineSnapshot());
+                }
+            }
         }
 
         function resetChainFlags() {
@@ -3760,8 +3851,8 @@
             // Draw Floating Chain / Combo Badges
             drawPopupsList(ctx, canvas.width, state.popups, 12);
 
-            // Render 2P Board if in VS CPU or 2P Local Battle mode
-            if ((state.mode === 'vs' || state.mode === 'vs2p') && cpuCtx) {
+            // Render 2P Board if in VS CPU, 2P Local Battle, or Online mode
+            if ((state.mode === 'vs' || state.mode === 'vs2p' || state.mode === 'online') && cpuCtx) {
                 renderCpuBoard();
             }
         }
@@ -4131,9 +4222,11 @@
             if (state.mode === 'vs') {
                 const streakEl = document.getElementById('vs-streak-badge');
                 if (streakEl) streakEl.textContent = state.vsWinsStreak + ' WINS (BEST: ' + state.bestVsStreak + ')';
-            } else if (state.mode === 'vs2p') {
+            } else if (state.mode === 'vs2p' || state.mode === 'online') {
                 const tallyEl = document.getElementById('vs-2p-tally');
-                if (tallyEl) tallyEl.textContent = '1P ' + state.p1MatchWins + ' - ' + state.p2MatchWins + ' 2P';
+                const opp = state.mode === 'online' ? ((window.onlineClient && window.onlineClient.peerName) || 'OPP').slice(0, 8) : '2P';
+                const you = state.mode === 'online' ? 'YOU' : '1P';
+                if (tallyEl) tallyEl.textContent = you + ' ' + state.p1MatchWins + ' - ' + state.p2MatchWins + ' ' + opp;
             }
         }
 
@@ -4197,10 +4290,10 @@
                 activeBtn.className = 'mode-tab snes-btn px-2.5 py-1.5 rounded-xl text-xs font-bold bg-pink-600 text-white border border-pink-300';
             }
 
-            const isDualBoard = newMode === 'vs' || newMode === 'vs2p';
+            const isDualBoard = newMode === 'vs' || newMode === 'vs2p' || newMode === 'online';
             document.getElementById('boss-hud').classList.toggle('hidden', !isDualBoard);
             document.getElementById('vs-cpu-ladder-box').classList.toggle('hidden', newMode !== 'vs');
-            document.getElementById('vs-2p-score-box').classList.toggle('hidden', newMode !== 'vs2p');
+            document.getElementById('vs-2p-score-box').classList.toggle('hidden', newMode !== 'vs2p' && newMode !== 'online');
             document.getElementById('btn-p2-raise').classList.toggle('hidden', newMode !== 'vs2p');
             document.getElementById('puzzle-hud').classList.toggle('hidden', newMode !== 'puzzle');
             document.getElementById('btn-garbage-test').classList.toggle('hidden', newMode === 'puzzle');
@@ -4217,6 +4310,24 @@
 
         function triggerGameOver() {
             state.gameOver = true;
+
+            if (state.mode === 'online') {
+                state.p2MatchWins++;
+                audio.playGameOver();
+                updateHUD();
+                if (window.onlineClient) window.onlineClient.sendGameOver({ score: state.score });
+                const opp = (window.onlineClient && window.onlineClient.peerName) || 'Opponent';
+                const tally = 'YOU ' + state.p1MatchWins + ' - ' + state.p2MatchWins + ' ' + opp.slice(0, 8);
+                showOverlay(
+                    '💔',
+                    'YOU TOPPED OUT!',
+                    opp + ' wins this round! Series: ' + tally,
+                    '⚔️ REMATCH',
+                    true,
+                    'Series: ' + tally
+                );
+                return;
+            }
 
             if (state.mode === 'vs2p') {
                 state.p2MatchWins++;
@@ -4323,6 +4434,16 @@
 
         function handleOverlayPrimary() {
             audio.unlock();
+            if (state.mode === 'online' && (state.p2RoundOver || state.gameOver || state.victory)) {
+                if (window.onlineClient && window.onlineClient.roomCode) {
+                    window.onlineClient.requestRematch();
+                    const btn = document.getElementById('overlay-primary-btn');
+                    if (btn) btn.textContent = '⏳ WAITING FOR OPPONENT...';
+                } else {
+                    openOnlineModal('pdp');
+                }
+                return;
+            }
             if (state.stageClearPending) {
                 advanceToNextVsStage();
             } else if (state.p2RoundOver || (state.gameOver && state.mode === 'vs2p')) {
@@ -5487,6 +5608,367 @@
             toggleCRT,
             setActivePauseHandler: (fn) => { activePauseHandler = fn; }
         };
+
+        /* ============================================================================
+         * 11. ONLINE HOST / CLIENT MULTIPLAYER LOBBY & PANEL DE PON SYNC
+         * ============================================================================ */
+        let lastPdpOnlineSyncMs = 0;
+        let onlineModalTargetGame = 'pdp';
+        let onlineEventsBound = false;
+
+        function setupOnlineBattle() {
+            const oppName = (window.onlineClient && window.onlineClient.peerName) || 'Opponent';
+            const roleLabel = (window.onlineClient && window.onlineClient.role === 'host') ? 'HOST (1P)' : 'CLIENT (2P)';
+            updateCharacterCard(
+                '🌐',
+                'Online vs ' + oppName,
+                '"Live ' + roleLabel + ' match over WebSocket!"',
+                'ONLINE VS'
+            );
+            const cpuNameEl = document.getElementById('cpu-header-name');
+            const cpuAvatarEl = document.getElementById('cpu-header-avatar');
+            const tallyEl = document.getElementById('vs-2p-tally');
+            const loadLabel = document.getElementById('p2-load-label');
+            if (cpuNameEl) cpuNameEl.textContent = oppName.toUpperCase();
+            if (cpuAvatarEl) cpuAvatarEl.textContent = '🌐';
+            if (tallyEl) tallyEl.textContent = 'YOU ' + state.p1MatchWins + ' - ' + state.p2MatchWins + ' ' + oppName.slice(0, 8);
+            if (loadLabel) loadLabel.textContent = '🌐 Opponent Board Load';
+
+            state.cpu.grid = [];
+            for (let r = 0; r < ROWS; r++) {
+                state.cpu.grid.push(new Array(COLS).fill(null));
+            }
+            state.cpu.nextRow = [];
+            state.cpu.riseOffset = 0;
+            state.cpu.cursorX = 2;
+            state.cpu.cursorY = 7;
+            state.cpu.score = 0;
+            state.cpu.popups = [];
+            state.cpu.particles = [];
+            updateBossHUD();
+        }
+
+        function serializePdpOnlineSnapshot() {
+            const grid = [];
+            for (let r = 0; r < ROWS; r++) {
+                const row = [];
+                for (let c = 0; c < COLS; c++) {
+                    const p = state.grid[r] ? state.grid[r][c] : null;
+                    if (!p) {
+                        row.push(null);
+                    } else {
+                        row.push([
+                            p.type,
+                            p.state,
+                            p.isGarbage ? 1 : 0,
+                            p.garbageW || 0,
+                            p.garbageH || 0,
+                            p.garbageRowIdx || 0,
+                            p.garbageColIdx || 0
+                        ]);
+                    }
+                }
+                grid.push(row);
+            }
+            const nextRow = (state.nextRow || []).map(p => (p ? p.type : 0));
+            return {
+                grid,
+                nextRow,
+                riseOffset: state.riseOffset,
+                cursorX: state.cursorX,
+                cursorY: state.cursorY,
+                score: state.score
+            };
+        }
+
+        function applyPdpOnlineSnapshot(snap) {
+            if (!snap || !Array.isArray(snap.grid)) return;
+            for (let r = 0; r < ROWS; r++) {
+                const srcRow = snap.grid[r] || [];
+                if (!state.cpu.grid[r]) state.cpu.grid[r] = new Array(COLS).fill(null);
+                for (let c = 0; c < COLS; c++) {
+                    const cell = srcRow[c];
+                    if (!cell) {
+                        state.cpu.grid[r][c] = null;
+                    } else {
+                        state.cpu.grid[r][c] = {
+                            type: cell[0],
+                            state: cell[1],
+                            isGarbage: Boolean(cell[2]),
+                            garbageW: cell[3] || 0,
+                            garbageH: cell[4] || 0,
+                            garbageRowIdx: cell[5] || 0,
+                            garbageColIdx: cell[6] || 0,
+                            timer: 0,
+                            popDelay: 0,
+                            chainEligible: false
+                        };
+                    }
+                }
+            }
+            if (Array.isArray(snap.nextRow)) {
+                state.cpu.nextRow = snap.nextRow.map(t => (t ? createPanel(t) : null));
+            }
+            state.cpu.riseOffset = Number(snap.riseOffset || 0);
+            state.cpu.cursorX = Number(snap.cursorX ?? 2);
+            state.cpu.cursorY = Number(snap.cursorY ?? 7);
+            state.cpu.score = Number(snap.score || 0);
+            const cpuScoreEl = document.getElementById('cpu-score-val');
+            if (cpuScoreEl) cpuScoreEl.textContent = String(state.cpu.score);
+            updateBossHUD();
+        }
+
+        function setOnlineStatusMsg(text, isError = false) {
+            const el = document.getElementById('online-status-msg');
+            if (!el) return;
+            el.textContent = text;
+            el.className = isError
+                ? 'text-xs text-center text-rose-400 font-bold min-h-[1.25rem]'
+                : 'text-xs text-center text-emerald-300 font-bold min-h-[1.25rem]';
+        }
+
+        function syncOnlineModalUI() {
+            const client = window.onlineClient;
+            if (!client) return;
+            const idleBox = document.getElementById('online-lobby-idle');
+            const roomBox = document.getElementById('online-lobby-room');
+            const codeDisplay = document.getElementById('online-room-code-display');
+            const roleLine = document.getElementById('online-role-line');
+            const peerLine = document.getElementById('online-peer-line');
+            const startBtn = document.getElementById('online-start-btn');
+            const pingBadge = document.getElementById('online-ping-badge');
+            const gameBadge = document.getElementById('online-game-badge');
+
+            const activeGame = client.roomCode ? client.game : onlineModalTargetGame;
+            if (gameBadge) {
+                gameBadge.textContent = activeGame === 'pikiinya' ? 'PIKIINYA!' : 'PANEL DE PON';
+                gameBadge.className = activeGame === 'pikiinya'
+                    ? 'text-[10px] px-2 py-0.5 rounded-full bg-cyan-600 text-white font-bold'
+                    : 'text-[10px] px-2 py-0.5 rounded-full bg-pink-600 text-white font-bold';
+            }
+            if (pingBadge) {
+                pingBadge.textContent = client.pingMs !== null ? (client.pingMs + ' ms') : '-- ms';
+            }
+
+            if (client.roomCode) {
+                idleBox?.classList.add('hidden');
+                roomBox?.classList.remove('hidden');
+                if (codeDisplay) codeDisplay.textContent = client.roomCode;
+                if (roleLine) {
+                    roleLine.textContent = client.role === 'host'
+                        ? ('Role: HOST (' + client.localName + ')')
+                        : ('Role: CLIENT (' + client.localName + ')');
+                }
+                if (peerLine) {
+                    peerLine.textContent = client.peerName
+                        ? ('Opponent: ' + client.peerName + ' ✅ Connected!')
+                        : (client.role === 'host' ? 'Waiting for opponent to join...' : 'Connecting to host...');
+                }
+                if (startBtn) {
+                    const showStart = client.role === 'host' && Boolean(client.peerName);
+                    startBtn.classList.toggle('hidden', !showStart);
+                }
+            } else {
+                idleBox?.classList.remove('hidden');
+                roomBox?.classList.add('hidden');
+            }
+        }
+
+        function bindPdpAndModalOnlineEvents() {
+            if (onlineEventsBound || !window.onlineClient) return;
+            onlineEventsBound = true;
+            const client = window.onlineClient;
+
+            client.on('status', () => syncOnlineModalUI());
+            client.on('hosted', (msg) => {
+                setOnlineStatusMsg('Room ' + msg.code + ' created! Share the code or invite link.');
+                syncOnlineModalUI();
+            });
+            client.on('joined', (msg) => {
+                setOnlineStatusMsg('Joined room ' + msg.code + '! Waiting for host to start...');
+                if (msg.game && window.appSelectGame && window.activeAppGame !== msg.game) {
+                    window.appSelectGame(msg.game);
+                }
+                syncOnlineModalUI();
+            });
+            client.on('peer_joined', (msg) => {
+                setOnlineStatusMsg((msg.peerName || 'Opponent') + ' joined! Press Start Online Match.');
+                syncOnlineModalUI();
+            });
+            client.on('peer_left', (msg) => {
+                setOnlineStatusMsg(msg.reason || 'Opponent disconnected.', true);
+                syncOnlineModalUI();
+                if (state.mode === 'online' && !state.gameOver && !state.p2RoundOver) {
+                    state.p2RoundOver = true;
+                    showOverlay('🔌', 'OPPONENT LEFT', msg.reason || 'Connection closed.', '🌐 BACK TO LOBBY', false, null);
+                }
+            });
+            client.on('error', (msg) => {
+                setOnlineStatusMsg(msg.message || 'Connection error.', true);
+            });
+            client.on('started', (msg) => {
+                closeOnlineModal(true);
+                if (msg.game === 'pikiinya') {
+                    if (window.appSelectGame) window.appSelectGame('pikiinya');
+                    return;
+                }
+                if (window.appSelectGame && window.activeAppGame !== 'pdp') {
+                    window.appSelectGame('pdp');
+                }
+                state.score = 0;
+                state.clearedCount = 0;
+                state.maxChain = 1;
+                state.elapsedSec = 0;
+                state.speedLevel = 1;
+                state.manualSpeedLocked = false;
+                switchMode('online');
+                logEvent('🌐 <strong>Online Match Started</strong> vs <strong>' + (client.peerName || 'Opponent') + '</strong>!');
+            });
+            client.on('sync', (msg) => {
+                if (state.mode === 'online' && msg.state) {
+                    applyPdpOnlineSnapshot(msg.state);
+                }
+            });
+            client.on('attack', (msg) => {
+                if (state.mode === 'online' && msg.attack && !state.gameOver && !state.p2RoundOver) {
+                    const count = Number(msg.attack.count || 0);
+                    const chain = Number(msg.attack.chain || 1);
+                    if (count >= 4 || chain >= 2) {
+                        sendVsAttack(count, chain, state.grid, state.popups, client.peerName || 'Opponent', false);
+                    }
+                }
+            });
+            client.on('gameover', (msg) => {
+                if (state.mode !== 'online' || state.gameOver || state.p2RoundOver) return;
+                if (msg.loser !== client.role) {
+                    state.p2RoundOver = true;
+                    state.p1MatchWins++;
+                    audio.playVictory();
+                    updateHUD();
+                    const opp = client.peerName || 'Opponent';
+                    const tally = 'YOU ' + state.p1MatchWins + ' - ' + state.p2MatchWins + ' ' + opp.slice(0, 8);
+                    showOverlay(
+                        '🏆',
+                        'YOU WIN ONLINE!',
+                        opp + ' topped out! Series: ' + tally,
+                        '⚔️ REMATCH',
+                        true,
+                        'Series: ' + tally
+                    );
+                }
+            });
+        }
+
+        function openOnlineModal(game) {
+            bindPdpAndModalOnlineEvents();
+            onlineModalTargetGame = game || window.activeAppGame || 'pdp';
+            const nameInput = document.getElementById('online-player-name');
+            if (nameInput && !nameInput.value) {
+                nameInput.value = localStorage.getItem('snes_online_name') || 'Player';
+            }
+            const modal = document.getElementById('online-modal');
+            if (modal) modal.classList.remove('hidden');
+            state.paused = true;
+            if (window.getPikiinyaController) {
+                window.getPikiinyaController()?.pauseFromModal?.(true);
+            }
+            setOnlineStatusMsg('');
+            syncOnlineModalUI();
+        }
+
+        function openOnlineModalForJoin(code, game) {
+            openOnlineModal(game);
+            const codeInput = document.getElementById('online-join-code');
+            if (codeInput) codeInput.value = String(code || '').toUpperCase();
+            setOnlineStatusMsg('Invite link loaded! Enter your name and click Join Room.');
+        }
+
+        function closeOnlineModal(fromMatchStart = false) {
+            const modal = document.getElementById('online-modal');
+            if (modal) modal.classList.add('hidden');
+            if (!fromMatchStart) {
+                state.paused = false;
+                if (window.getPikiinyaController) {
+                    window.getPikiinyaController()?.pauseFromModal?.(false);
+                }
+            }
+        }
+
+        async function handleOnlineHostClick() {
+            bindPdpAndModalOnlineEvents();
+            const client = window.onlineClient;
+            if (!client) return;
+            const nameInput = document.getElementById('online-player-name');
+            const name = (nameInput && nameInput.value.trim()) || 'Host';
+            localStorage.setItem('snes_online_name', name);
+            const opts = {};
+            if (onlineModalTargetGame === 'pikiinya') {
+                const ctrl = window.getPikiinyaController ? window.getPikiinyaController() : null;
+                if (ctrl && typeof ctrl.getEffectiveColsForCurrentMode === 'function') {
+                    opts.cols = ctrl.getEffectiveColsForCurrentMode();
+                }
+            }
+            setOnlineStatusMsg('Connecting to server...');
+            try {
+                await client.hostRoom(onlineModalTargetGame, name, opts);
+            } catch (err) {
+                setOnlineStatusMsg('Failed to connect to WebSocket server.', true);
+            }
+        }
+
+        async function handleOnlineJoinClick() {
+            bindPdpAndModalOnlineEvents();
+            const client = window.onlineClient;
+            if (!client) return;
+            const nameInput = document.getElementById('online-player-name');
+            const codeInput = document.getElementById('online-join-code');
+            const name = (nameInput && nameInput.value.trim()) || 'Guest';
+            const code = (codeInput && codeInput.value.trim().toUpperCase()) || '';
+            if (code.length < 4) {
+                setOnlineStatusMsg('Please enter the 4-character room code.', true);
+                return;
+            }
+            localStorage.setItem('snes_online_name', name);
+            setOnlineStatusMsg('Joining room ' + code + '...');
+            try {
+                await client.joinRoom(code, name);
+            } catch (err) {
+                setOnlineStatusMsg('Failed to connect to WebSocket server.', true);
+            }
+        }
+
+        function handleOnlineStartClick() {
+            const client = window.onlineClient;
+            if (!client) return;
+            const opts = {};
+            if (client.game === 'pikiinya' && window.getPikiinyaController) {
+                const ctrl = window.getPikiinyaController();
+                if (ctrl && typeof ctrl.getEffectiveColsForCurrentMode === 'function') {
+                    opts.cols = ctrl.getEffectiveColsForCurrentMode();
+                }
+            }
+            client.startMatch(opts);
+        }
+
+        function handleOnlineLeaveClick() {
+            window.onlineClient?.leaveRoom();
+            setOnlineStatusMsg('Left the room.');
+            syncOnlineModalUI();
+        }
+
+        async function copyOnlineInviteLink() {
+            const url = window.onlineClient?.getInviteUrl();
+            if (!url) return;
+            try {
+                await navigator.clipboard.writeText(url);
+                setOnlineStatusMsg('Invite link copied to clipboard!');
+            } catch {
+                setOnlineStatusMsg(url);
+            }
+        }
+
+        window.openOnlineModal = openOnlineModal;
+        window.openOnlineModalForJoin = openOnlineModalForJoin;
 
         function stepFrame() {
             const now = performance.now();

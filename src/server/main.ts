@@ -14,6 +14,8 @@ import { RoomManager } from './rooms.ts';
 import type { Peer } from './rooms.ts';
 import { send } from './rooms.ts';
 import { hashState } from '../core/hash.ts';
+import { OnlineRelayManager } from './online-relay.ts';
+import type { OnlineIncomingMessage, OnlinePeer } from './online-relay.ts';
 
 const PORT = Number(process.env.PORT ?? 8787);
 const HOST = process.env.HOST ?? '0.0.0.0';
@@ -99,11 +101,26 @@ function countConnections(): number {
 
 interface Session {
   peer: Peer;
+  onlinePeer: OnlinePeer;
   socket: WebSocket;
   alive: boolean;
 }
 
 const sessions = new Map<WebSocket, Session>();
+const onlineRelay = new OnlineRelayManager();
+
+function makeOnlinePeer(id: string, socket: WebSocket): OnlinePeer {
+  return {
+    id,
+    name: 'Player',
+    role: 'host',
+    send: (payload: Record<string, unknown>) => {
+      if (socket.readyState === 1) {
+        socket.send(JSON.stringify(payload));
+      }
+    },
+  };
+}
 
 function makePeer(socket: WebSocket): Peer {
   return {
@@ -129,7 +146,13 @@ server.on('upgrade', (req, socket, head) => {
 });
 
 wss.on('connection', (socket: WebSocket) => {
-  const session: Session = { peer: makePeer(socket), socket, alive: true };
+  const peer = makePeer(socket);
+  const session: Session = {
+    peer,
+    onlinePeer: makeOnlinePeer(peer.id, socket),
+    socket,
+    alive: true,
+  };
   sessions.set(socket, session);
   send(session.peer, { t: 'welcome', playerId: session.peer.id, token: session.peer.token, ver: PROTOCOL_VERSION });
 
@@ -140,11 +163,20 @@ wss.on('connection', (socket: WebSocket) => {
   socket.on('message', (raw) => {
     const message = decode(raw.toString()) as ClientMessage | null;
     if (!message) return;
+    if (typeof (message as { t?: unknown }).t === 'string' && (message as { t: string }).t.startsWith('net_')) {
+      onlineRelay.handleMessage(
+        session.onlinePeer,
+        message as unknown as OnlineIncomingMessage,
+        (code) => manager.rooms.has(code),
+      );
+      return;
+    }
     handle(session, message);
   });
 
   socket.on('close', () => {
     sessions.delete(socket);
+    onlineRelay.leave(session.onlinePeer);
     manager.remove(session.peer);
     const room = manager.byPeer.get(session.peer);
     if (room) room.sendRoomState();
