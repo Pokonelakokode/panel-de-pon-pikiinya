@@ -241,6 +241,10 @@ export class PikiinyaController {
     if (romModal && !romModal.classList.contains('hidden')) {
       return window.getComputedStyle(romModal).display !== 'none';
     }
+    const onlineModal = document.getElementById('online-modal');
+    if (onlineModal && !onlineModal.classList.contains('hidden')) {
+      return window.getComputedStyle(onlineModal).display !== 'none';
+    }
     return false;
   }
 
@@ -1495,6 +1499,11 @@ export class PikiinyaController {
     if (settingsDialog?.open) return;
     if (!document.getElementById('help-modal')?.classList.contains('hidden')) return;
     if (!document.getElementById('rom-modal')?.classList.contains('hidden')) return;
+    if (!document.getElementById('online-modal')?.classList.contains('hidden')) return;
+    const targetEl = e.target as HTMLElement | null;
+    if (targetEl && (targetEl.tagName === 'INPUT' || targetEl.tagName === 'TEXTAREA' || targetEl.tagName === 'SELECT' || targetEl.isContentEditable)) {
+      return;
+    }
 
     if (this.helpModalOpen) {
       if (e.code === 'Escape') {

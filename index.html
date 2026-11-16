@@ -5099,6 +5099,16 @@
                 return;
             }
 
+            if (!document.getElementById('online-modal').classList.contains('hidden')) {
+                if (e.key === 'Escape') closeOnlineModal();
+                return;
+            }
+
+            const targetEl = e.target;
+            if (targetEl && (targetEl.tagName === 'INPUT' || targetEl.tagName === 'TEXTAREA' || targetEl.tagName === 'SELECT' || targetEl.isContentEditable)) {
+                return;
+            }
+
             if (window.activeAppGame !== 'pdp') return;
 
             // 2. Stage Clear / Round Over / Game Over Overlay Confirmation
